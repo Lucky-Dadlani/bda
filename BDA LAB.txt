@@ -1,0 +1,505 @@
+﻿Steps to execute Hadoop
+
+
+ssh localhost
+
+
+ssh-keygen -t rsa -P "" -f ~/.ssh/id_rsa
+
+
+cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
+
+
+chmod 0600 ~/.ssh/authorized_keys
+
+
+hadoop-3.2.3/bin/hdfs namenode -format
+
+
+export PDSH_RCMD_TYPE=ssh
+
+
+start-all.sh
+
+
+jps
+
+
+After Writing Code
+
+
+gedit <JavaFile>.java            
+gedit <inputfile>.txt            
+
+
+sudo update-alternatives --config javac
+mapred classpath
+export CLASSPATH="paste the path printed above"
+
+
+javac -source 8 -target 8 <JavaFile>.java
+
+
+mkdir <Folder>
+cp <ClassName>*.class <Folder>/
+jar -cvf <Jar>.jar -C <Folder> /.
+
+
+hdfs dfs -put <inputfile>.txt /<hdfs_input>
+hadoop jar <Jar>.jar <ClassName> /<hdfs_input> /<hdfs_output>
+
+
+hdfs dfs -ls /<hdfs_output>
+hdfs dfs -cat /<hdfs_output>/part-r-00000
+________________
+
+
+Program 1
+# Create an HDFS directory
+hadoop fs -mkdir -p /demo/bda
+
+# Create a local sample file
+echo "Hello Hadoop" > ex.txt
+
+# Upload the file to HDFS
+hadoop fs -put ex.txt /demo/bda/
+
+# List the directory contents
+hadoop fs -ls /demo/bda
+
+# Download a file from HDFS to the local directory
+hadoop fs -get /demo/bda/ex.txt ./ex_retrieved.txt
+
+# Upload another file
+echo "New Hadoop file" > new.txt
+hadoop fs -put new.txt /demo/bda/
+
+# Delete a file from HDFS
+hadoop fs -rm /demo/bda/ex.txt
+
+# Delete the directory and its contents
+hadoop fs -rm -r /demo/bda
+
+# Stop Hadoop services when finished (optional)
+stop-all.sh
+	________________
+
+
+Weather Program
+
+
+gedit WeatherMapReduce1.java
+
+
+import java.io.IOException;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+public class WeatherMapReduce1 {
+
+   // Mapper
+   public static class Map extends Mapper<Object, Text, Text, Text> {
+
+       public void map(Object key, Text value, Context context)
+               throws IOException, InterruptedException {
+
+           String[] data = value.toString().split(",");
+
+           String city = data[0];
+           double temp = Double.parseDouble(data[1]);
+
+           String condition;
+
+           if (temp < 0)
+               condition = "Freezing";
+           else if (temp <= 15)
+               condition = "Cold";
+           else if (temp <= 25)
+               condition = "Warm";
+           else
+               condition = "Hot";
+
+           context.write(new Text(city), new Text(condition));
+       }
+   }
+
+   // Reducer
+   public static class Reduce extends Reducer<Text, Text, Text, Text> {
+
+       public void reduce(Text key, Iterable<Text> values,
+                          Context context)
+               throws IOException, InterruptedException {
+
+           String result = "";
+
+           for (Text value : values)
+               result += value.toString() + " ";
+
+           context.write(key, new Text(result.trim()));
+       }
+   }
+
+   // Driver
+   public static void main(String[] args) throws Exception {
+
+       Job job = Job.getInstance(new Configuration(), "Weather");
+
+       job.setJarByClass(WeatherMapReduce1.class);
+       job.setMapperClass(Map.class);
+       job.setReducerClass(Reduce.class);
+
+       job.setOutputKeyClass(Text.class);
+       job.setOutputValueClass(Text.class);
+
+       FileInputFormat.addInputPath(job, new Path(args[0]));
+       FileOutputFormat.setOutputPath(job, new Path(args[1]));
+
+       System.exit(job.waitForCompletion(true) ? 0 : 1);
+   }
+}
+	________________
+
+
+Movie 
+import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+public class MovieTags {
+
+   // Mapper
+   public static class Map extends Mapper<Object, Text, Text, Text> {
+
+       public void map(Object key, Text value, Context context)
+               throws IOException, InterruptedException {
+
+           String[] data = value.toString().split(",");
+
+           if (data.length == 4)
+               context.write(new Text(data[1]), new Text(data[2]));
+       }
+   }
+
+   // Reducer
+   public static class Reduce extends Reducer<Text, Text, Text, Text> {
+
+       public void reduce(Text key, Iterable<Text> values,
+                          Context context)
+               throws IOException, InterruptedException {
+
+           Set<String> tags = new HashSet<>();
+
+           for (Text value : values)
+               tags.add(value.toString());
+
+           context.write(key, new Text(String.join(", ", tags)));
+       }
+   }
+
+   // Driver
+   public static void main(String[] args) throws Exception {
+
+       Job job = Job.getInstance(new Configuration(), "Movie Tags");
+
+       job.setJarByClass(MovieTags.class);
+       job.setMapperClass(Map.class);
+       job.setReducerClass(Reduce.class);
+
+       job.setOutputKeyClass(Text.class);
+       job.setOutputValueClass(Text.class);
+
+       FileInputFormat.addInputPath(job, new Path(args[0]));
+       FileOutputFormat.setOutputPath(job, new Path(args[1]));
+
+       System.exit(job.waitForCompletion(true) ? 0 : 1);
+   }
+}
+	
+
+________________
+Word Count
+import java.io.IOException;
+import java.util.StringTokenizer;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+public class WordCount {
+
+   // Mapper
+   public static class Map extends Mapper<Object, Text, Text, IntWritable> {
+
+       IntWritable one = new IntWritable(1);
+       Text word = new Text();
+
+       public void map(Object key, Text value, Context context)
+               throws IOException, InterruptedException {
+
+           StringTokenizer st = new StringTokenizer(value.toString());
+
+           while (st.hasMoreTokens()) {
+               word.set(st.nextToken().toLowerCase());
+               context.write(word, one);
+           }
+       }
+   }
+
+   // Reducer
+   public static class Reduce extends Reducer<Text, IntWritable, Text, IntWritable> {
+
+       public void reduce(Text key, Iterable<IntWritable> values,
+                          Context context)
+               throws IOException, InterruptedException {
+
+           int sum = 0;
+
+           for (IntWritable value : values)
+               sum += value.get();
+
+           context.write(key, new IntWritable(sum));
+       }
+   }
+
+   // Driver
+   public static void main(String[] args) throws Exception {
+
+       Job job = Job.getInstance(new Configuration(), "Word Count");
+
+       job.setJarByClass(WordCount.class);
+       job.setMapperClass(Map.class);
+       job.setReducerClass(Reduce.class);
+
+       job.setOutputKeyClass(Text.class);
+       job.setOutputValueClass(IntWritable.class);
+
+       FileInputFormat.addInputPath(job, new Path(args[0]));
+       FileOutputFormat.setOutputPath(job, new Path(args[1]));
+
+       System.exit(job.waitForCompletion(true) ? 0 : 1);
+   }
+}
+
+	
+
+________________
+
+
+MongoDB Functions
+sudo systemctl start mongod
+sudo systemctl status mongod
+mongosh
+db.users.insertMany([
+{name: "Alice", age: 30, gender: "Female", city: "New York"},
+{name: "Bob", age: 25, gender: "Male", city: "Los Angeles"},
+{name: "Charlie", age: 35, gender: "Male", city: "Chicago"},
+{name: "David", age: 28, gender: "Male", city: "San Francisco"},
+{name: "Eve", age: 22, gender: "Female", city: "Boston"},
+{name: "Frank", age: 40, gender: "Male", city: "Houston"},
+{name: "Grace", age: 27, gender: "Female", city: "Miami"},
+{name: "Hannah", age: 29, gender: "Female", city: "Seattle"},
+{name: "Isaac", age: 31, gender: "Male", city: "Denver"},
+{name: "Jack", age: 26, gender: "Male", city: "Dallas"}
+])
+
+Top 15 Operations
+
+Count All Users
+db.users.countDocuments({})
+Output: 10
+
+Count Users Whose Age Is Greater Than 25
+db.users.countDocuments({age: {$gt: 25}})
+Output: 7
+
+Sort Users by Age in Ascending Order
+db.users.find().sort({age: 1})
+Output: Eve (22), Bob (25), Jack (26), Grace (27), David (28), Hannah (29), Alice (30), Isaac (31), Charlie (35), Frank (40).
+
+Skip 9 Documents
+db.users.find().skip(9)
+Output: Returns one document. The specific document is not guaranteed because no sort order is specified.
+
+Count Users by Gender
+db.users.aggregate([
+{$group: {_id: "$gender", count: {$sum: 1}}}
+])
+Output:
+Female: 4
+Male: 6
+
+
+Find Users from New York
+db.users.find({city: "New York"})
+Output: Alice.
+
+
+Find All Female Users
+db.users.find({gender: "Female"})
+Output: 4 documents -- Alice, Eve, Grace, and Hannah.
+
+
+Find Users Aged Between 25 and 30
+db.users.find({age: {$gte: 25, $lte: 30}})
+Output: Bob, Jack, Grace, David, Hannah, and Alice.
+
+Sort Users by Age in Descending Order
+db.users.find().sort({age: -1})
+Output: Frank (40), Charlie (35), Isaac (31), Alice (30), Hannah (29), David (28), Grace (27), Jack (26), Bob (25), Eve (22).
+
+Limit Output to 3 Documents
+db.users.find().limit(3)
+Output: Returns at most 3 documents.
+
+Skip 2 Documents and Limit to 3
+db.users.find().skip(2).limit(3)
+Output: Returns 3 documents after skipping the first 2.
+
+Display Only Name and Age
+db.users.find({}, {_id: 0, name: 1, age: 1})
+Output: Displays only the name and age fields, without the _id field.
+
+
+Find the Oldest User
+db.users.find().sort({age: -1}).limit(1)
+Output: Frank, age 40.
+
+
+Find the Youngest User
+db.users.find().sort({age: 1}).limit(1)
+Output: Eve, age 22.
+
+Calculate the Average Age
+db.users.aggregate([
+{$group: {_id: null, averageAge: {$avg: "$age"}}}
+])
+Output: 29.3
+	________________
+
+
+Pig Latin
+pig -x local
+
+
+employees.txt
+101,John,IT,50000 102,Susan,HR,60000 103,David,IT,55000 104,Emma,Finance,75000 105,James,HR,62000 106,Robert,IT,58000
+
+departments.txt
+IT,Information Technology HR,Human Resources Finance,Finance Department
+
+1. Sort by Salary Descending
+e = LOAD 'employees.txt' USING PigStorage(',') AS (id:int,name:chararray,dept:chararray,salary:int);
+s = ORDER e BY salary DESC;
+DUMP s;
+
+2. Group by Department
+e = LOAD 'employees.txt' USING PigStorage(',') AS (id:int,name:chararray,dept:chararray,salary:int);
+g = GROUP e BY dept;
+DUMP g;
+
+3. Join with Department Names
+e = LOAD 'employees.txt' USING PigStorage(',') AS (id:int,name:chararray,dept:chararray,salary:int);
+d = LOAD 'departments.txt' USING PigStorage(',') AS (dept_code:chararray,dept_name:chararray);
+j = JOIN e BY dept, d BY dept_code;
+r = FOREACH j GENERATE id,name,dept_name,salary;
+DUMP r;
+
+4. Project Name and Salary
+e = LOAD 'employees.txt' USING PigStorage(',') AS (id:int,name:chararray,dept:chararray,salary:int);
+p = FOREACH e GENERATE name,salary;
+DUMP p;
+
+5. Filter Salary Greater Than 55000
+e = LOAD 'employees.txt' USING PigStorage(',') AS (id:int,name:chararray,dept:chararray,salary:int);
+f = FILTER e BY salary > 55000;
+DUMP f;
+
+	
+
+
+
+javac -source 8 -target 8 WeatherMapReduce1.java
+
+
+mkdir WeatherFolder
+cp WeatherMapReduce1*.class WeatherFolder/
+
+
+jar -cvf Weather.jar -C WeatherFolder .
+
+
+hdfs dfs -put weather.txt /weather_input
+
+
+hadoop jar Weather.jar WeatherMapReduce1 /weather_input /weather_output
+
+
+hdfs dfs -ls /weather_output
+hdfs dfs -cat /weather_output/part-r-00000
+
+
+________________
+
+
+javac -source 8 -target 8 MovieTags.java
+
+
+mkdir MovieFolder
+cp MovieTags*.class MovieFolder/
+
+
+jar -cvf MovieTags.jar -C MovieFolder .
+
+
+hdfs dfs -put movies.txt /movies_input
+
+
+hadoop jar MovieTags.jar MovieTags /movies_input /movies_output
+
+
+hdfs dfs -ls /movies_output
+hdfs dfs -cat /movies_output/part-r-00000
+
+
+________________
+
+
+javac -source 8 -target 8 WordCount.java
+
+
+mkdir WordCountFolder
+cp WordCount*.class WordCountFolder/
+
+
+jar -cvf WordCount.jar -C WordCountFolder .
+
+
+hdfs dfs -put input.txt /wordcount_input
+
+
+hadoop jar WordCount.jar WordCount /wordcount_input /wordcount_output
+
+
+hdfs dfs -ls /wordcount_output
+hdfs dfs -cat /wordcount_output/part-r-00000
